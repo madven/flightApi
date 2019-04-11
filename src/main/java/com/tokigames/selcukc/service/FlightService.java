@@ -19,6 +19,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 @Service
@@ -46,11 +48,26 @@ public class FlightService {
 
     private List<Flight> unifyFlights() {
         List<Flight> flights = new ArrayList<>();
-        List<CheapFlight> cheapFlights = cheapRepository.fetchFlights();
-        log.info("Cheap flights size: " + cheapFlights.size());
-        List<BusinessFlight> businessFlights = businessRepository.fetchFlights();
-        log.info("Business flights size: " + businessFlights.size());
+        CompletableFuture<List<CheapFlight>> cfa = CompletableFuture.supplyAsync(cheapRepository::fetchFlights);
+        CompletableFuture<List<BusinessFlight>> cfb = CompletableFuture.supplyAsync(businessRepository::fetchFlights);
+        try {
+            List<CheapFlight> cheapFlights = cfa.get();
+            log.info("Cheap flights size: " + cheapFlights.size());
+            List<BusinessFlight> businessFlights = cfb.get();
+            log.info("Business flights size: " + businessFlights.size());
 
+            flights.addAll(cheapToFlight(cheapFlights));
+            flights.addAll(businessToFlight(businessFlights));
+
+        } catch (InterruptedException | ExecutionException e) {
+            e.printStackTrace();
+        }
+
+        return flights;
+    }
+
+    private List<Flight> cheapToFlight(List<CheapFlight> cheapFlights) {
+        List<Flight> flights = new ArrayList<>();
         Flight flight;
         for (CheapFlight cheapFlight : cheapFlights) {
             flight = new Flight();
@@ -60,7 +77,12 @@ public class FlightService {
             flight.setArrivalTime(cheapFlight.getArrivalTime());
             flights.add(flight);
         }
+        return flights;
+    }
 
+    private List<Flight> businessToFlight(List<BusinessFlight> businessFlights) {
+        List<Flight> flights = new ArrayList<>();
+        Flight flight;
         for (BusinessFlight businessFlight : businessFlights) {
             flight = new Flight();
             String[] departureArrival = businessFlight.getFlight().trim().split(" -> ");
@@ -70,7 +92,6 @@ public class FlightService {
             flight.setArrivalTime(businessFlight.getArrival());
             flights.add(flight);
         }
-
         return flights;
     }
 
