@@ -20,8 +20,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @Slf4j
@@ -47,23 +47,21 @@ public class FlightService {
     }
 
     private List<Flight> unifyFlights() {
-        List<Flight> flights = new ArrayList<>();
-        CompletableFuture<List<CheapFlight>> cfa = CompletableFuture.supplyAsync(cheapRepository::fetchFlights);
-        CompletableFuture<List<BusinessFlight>> cfb = CompletableFuture.supplyAsync(businessRepository::fetchFlights);
-        try {
-            List<CheapFlight> cheapFlights = cfa.get();
+
+        CompletableFuture<List<Flight>> cheapFuture = CompletableFuture.supplyAsync(() -> {
+            List<CheapFlight> cheapFlights = cheapRepository.fetchFlights();
             log.info("Cheap flights size: " + cheapFlights.size());
-            List<BusinessFlight> businessFlights = cfb.get();
+            return cheapToFlight(cheapFlights);
+        });
+        CompletableFuture<List<Flight>> businessFuture = CompletableFuture.supplyAsync(() -> {
+            List<BusinessFlight> businessFlights = businessRepository.fetchFlights();
             log.info("Business flights size: " + businessFlights.size());
+            return businessToFlight(businessFlights);
+        });
 
-            flights.addAll(cheapToFlight(cheapFlights));
-            flights.addAll(businessToFlight(businessFlights));
-
-        } catch (InterruptedException | ExecutionException e) {
-            e.printStackTrace();
-        }
-
-        return flights;
+        return Stream.of(cheapFuture, businessFuture)
+                .flatMap(completableFutures -> completableFutures.join().stream())
+                .collect(Collectors.toList());
     }
 
     private List<Flight> cheapToFlight(List<CheapFlight> cheapFlights) {
