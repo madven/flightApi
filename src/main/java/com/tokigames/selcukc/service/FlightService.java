@@ -93,7 +93,7 @@ public class FlightService {
         return flights;
     }
 
-    private List<Flight> filterFlights(List<Flight> flights,
+    public List<Flight> filterFlights(List<Flight> flights,
                                        Optional<String> departure, Optional<Long> departureBefore, Optional<Long> departureAfter,
                                        Optional<String> arrival, Optional<Long> arrivalBefore, Optional<Long> arrivalAfter) {
         if (departure.isPresent()) {
